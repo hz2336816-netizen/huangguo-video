@@ -49,21 +49,20 @@
         return;
       }
 
-      status.innerText = '正在通过代理线路解析，请稍候...';
+      status.innerText = '正在通过中转线路解析，请稍候...';
       iframe.style.display = 'none';
       video.style.display = 'none';
 
-      // 关键改动：通过同源 Functions 代理中转目标 API，彻底避免 CORS 跨域拦截
       const targetApi = 'https://huangguoai.com/?url=' + encodeURIComponent(input);
-      const proxyApi = '/api/proxy?url=' + encodeURIComponent(targetApi);
+      // 让请求全部经由 Cloudflare 代理中转
+      const proxyUrl = '/api/proxy?url=' + encodeURIComponent(targetApi);
 
       try {
-        const res = await fetch(proxyApi);
+        const res = await fetch(proxyUrl);
         const contentType = res.headers.get("content-type") || "";
 
         if (contentType.includes("application/json")) {
           const data = await res.json();
-          // 如果返回的是包含播放地址的 JSON 数据
           const playUrl = data.url || data.video || data.data;
           if (playUrl) {
             status.innerText = '解析成功，正在播放';
@@ -71,20 +70,20 @@
             video.style.display = 'block';
             video.play();
           } else {
-            status.innerText = '解析接口未返回有效地址，切换至网页播放模式';
-            iframe.src = targetApi;
+            status.innerText = '正在载入中转播放页面...';
+            iframe.src = proxyUrl;
             iframe.style.display = 'block';
           }
         } else {
-          // 如果目标本身就是嵌入式播放页，直接 iframe 加载
-          status.innerText = '加载播放器中...';
-          iframe.src = targetApi;
+          // 目标返回网页时，iframe 也强制走代理中转，绕过本地直连与 SSL 阻断
+          status.innerText = '正在载入中转播放页面...';
+          iframe.src = proxyUrl;
           iframe.style.display = 'block';
         }
       } catch (err) {
         console.error('解析出错:', err);
-        status.innerText = '接口直连异常，尝试备用嵌入窗口...';
-        iframe.src = targetApi;
+        status.innerText = '直连受阻，正在通过代理窗口呈现...';
+        iframe.src = proxyUrl;
         iframe.style.display = 'block';
       }
     }
